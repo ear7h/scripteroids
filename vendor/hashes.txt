@@ -1,1 +1,2 @@
 https://github.com/raysan5/raylib 7e62d973f95383a9e09a3520baad515e2e9b0705
+https://github.com/ear7h/libdatastructure 057ee41615301a1a3f49cace32e668c9b957d6f1

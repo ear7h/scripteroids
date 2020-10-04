@@ -5,9 +5,12 @@ CC := gcc
 
 CFLAGS := -std=c99 \
 	-Wall -Wextra -Wpedantic \
-	-Wstrict-overflow \
-	-I./include \
-	-I./vendor/raylib/src/
+	-Wstrict-overflow
+
+INCLUDES := -I./include \
+	-I./vendor/raylib/src/ \
+	-I./vendor/libdatastructure/include/
+
 
 LD := gcc
 
@@ -40,16 +43,19 @@ $(BUILD_DIR):
 $(BUILD_DIR)/libraylib.a:
 	$(MAKE) -C ./vendor/raylib/src PLATFORM=PLATFORM_$(PLATFORM)
 	cp ./vendor/raylib/src/libraylib.a $(BUILD_DIR)
-	
 
-_LIBS = raylib
+$(BUILD_DIR)/libdatastructure.a:
+	$(MAKE) -C ./vendor/libdatastructure archive
+	cp ./vendor/libdatastructure/src/libdatastructure.a $(BUILD_DIR)
+
+_LIBS = raylib datastructure
 LIBS = $(_LIBS:%=$(BUILD_DIR)/lib%.a)
 
 .PHONY: libs
 libs: $(BUILD_DIR) $(LIBS)
 
 $(BUILD_DIR)/%.o: src/%.c
-	$(CC) $(CFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
 _OBJECTS = main
 OBJECTS = $(_OBJECTS:%=$(BUILD_DIR)/%.o)

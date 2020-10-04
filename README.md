@@ -1,10 +1,9 @@
-# Raylib boilerplate
+# scripteroids
 
-This is a boilerplate raylib project, most important is the makefile.
+This is a work in progress.
 
-To get started just run `./init.sh`, then `make run` to run the simple
-window opening example.
-
-## TODO
-
-* add (figure out) support for PLATFORM=WEB
+The idea for this game is a simple version of asteroids, except the user
+has to program the ship with (a simple langugage and) a virtual machine
+that executes one instruction per time step. Some things should be tuned,
+but the idea is that human and programmable players should be "on the same
+level".
