@@ -23,6 +23,9 @@ size_t slice_len(slice_t s);
 // slice_cap returns the capacity of s
 size_t slice_cap(slice_t s);
 
+// slice_cap returns the raw pointer
+void * slice_data(slice_t s);
+
 // slice_append appends items to the end of a slice
 slice_t slice_append(slice_t s, void * el);
 

@@ -1,5 +1,5 @@
 
-SHELL := /bin/dash
+SHELL := /usr/bin/env sh
 
 CC := gcc
 
@@ -8,6 +8,7 @@ CFLAGS := -std=c99 \
 	-Wstrict-overflow
 
 INCLUDES := -I./include \
+	-I./libvm/include/ \
 	-I./vendor/raylib/src/ \
 	-I./vendor/libdatastructure/include/
 
@@ -48,7 +49,13 @@ $(BUILD_DIR)/libdatastructure.a:
 	$(MAKE) -C ./vendor/libdatastructure archive
 	cp ./vendor/libdatastructure/src/libdatastructure.a $(BUILD_DIR)
 
-_LIBS = raylib datastructure
+
+.PHONY: $(BUILD_DIR)/libvm.a
+$(BUILD_DIR)/libvm.a:
+	cd libvm && cargo build
+	cp libvm/target/debug/libvm.a $(BUILD_DIR)
+
+_LIBS = raylib datastructure vm
 LIBS = $(_LIBS:%=$(BUILD_DIR)/lib%.a)
 
 .PHONY: libs

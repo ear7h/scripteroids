@@ -6,6 +6,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <datastructure/slice.h>
+#include <vm.h>
 
 #define NUM_ASTEROID_TYPES 4
 #define SCREEN_WIDTH 800
@@ -100,6 +101,10 @@ size_t asteroids_len(asteroids_t as) {
 	return slice_len(as.inner);
 }
 
+size_t asteroids_data(asteroids_t as) {
+	return slice_data(as.inner);
+}
+
 Vector2 vec_up = { .x = 0, .y = 1 };
 
 #define SHIP_ANG_START (90.f)
@@ -162,6 +167,7 @@ int main(void) {
 		.ang = SHIP_ANG_START,
 		.acc = 0,
 	};
+	vm_t * vm = vm_c_compile("");
 
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "scripteroids");
 
@@ -173,6 +179,10 @@ int main(void) {
 	while (!WindowShouldClose()) {
 
 		if (IsKeyDown(KEY_Q)) break;
+
+		vm_c_step(vm,
+			asteroids_len(asteroids),
+			asteroids_data(asteroids));
 
 		BeginDrawing();
 
@@ -219,17 +229,19 @@ int main(void) {
 		ship.pos.x = fmodf(ship.pos.x + SCREEN_WIDTH, SCREEN_WIDTH);
 		ship.pos.y = fmodf(ship.pos.y + SCREEN_HEIGHT, SCREEN_HEIGHT);
 
+		uint8_t ship_control = vm_c_get_ship_control(vm);
+
 		// move the ship
 		const float torque = 8;
 		float omega = 0;
-		if (IsKeyDown(KEY_A)) omega -= torque;
-		if (IsKeyDown(KEY_D)) omega += torque;
+		if (IsKeyDown(KEY_A) | (ship_control & SHIP_CONTROL_LEFT)) omega -= torque;
+		if (IsKeyDown(KEY_D) | (ship_control & SHIP_CONTROL_RIGHT)) omega += torque;
 		// printf("omega: %f", omega);
 		ship.ang = fmodf(360 + ship.ang + omega, 360);
 
 		ship.dir = Vector2Scale(ship.dir, 0.95);
 
-		if (IsKeyDown(KEY_W)) {
+		if (IsKeyDown(KEY_W) | (ship_control & SHIP_CONTROL_FORWARD)) {
 			ship.acc = Clamp(ship.acc + 0.01, 0, 0.2);
 		} else {
 			ship.acc = 0;
@@ -252,8 +264,6 @@ int main(void) {
 		} else {
 			DrawText("collision: false" , 10, 60, 20, WHITE);
 		}
-
-
 
 		EndDrawing();
 	}

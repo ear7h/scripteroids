@@ -38,6 +38,10 @@ size_t slice_cap(slice_t s) {
     return s.cap;
 }
 
+void * slice_data(slice_t s) {
+    return s.data;
+}
+
 slice_t slice_append(slice_t s, void * el) {
     if (s.len == s.cap) {
 		size_t newcap = 1 + s.cap * 2;
