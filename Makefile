@@ -64,7 +64,7 @@ libs: $(BUILD_DIR) $(LIBS)
 $(BUILD_DIR)/%.o: src/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-_OBJECTS = main
+_OBJECTS = main rockets asteroids input
 OBJECTS = $(_OBJECTS:%=$(BUILD_DIR)/%.o)
 
 .PHONY: objects
@@ -80,8 +80,12 @@ all: $(BUILD_DIR)/scripteroids
 run: all
 	./$(BUILD_DIR)/scripteroids
 
+.PHONY: debug
+debug: all
+	lldb ./$(BUILD_DIR)/scripteroids
+
 .PHONY: clean
-clean: 
+clean:
 	# $(MAKE) -C ./vendor/raylib/src clean
 	rm -rf build
 

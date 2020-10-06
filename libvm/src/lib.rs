@@ -2,12 +2,10 @@
 #![allow(unused_variables)]
 
 use std::{
-    ffi::{
+    os::raw::{
         c_void,
-        CStr,
-        CString,
+        c_char,
     },
-    ptr::NonNull,
 };
 
 /// errors when building an architecture
@@ -426,6 +424,13 @@ pub fn run(mem : &mut Mem, cpu: &mut Cpu) -> Result<(), ReturnCode> {
     }
 }
 
+// asteroids
+
+const SHIP_CONTROL_FORWARD : u8 = 1;
+const SHIP_CONTROL_LEFT : u8 = 2;
+const SHIP_CONTROL_RIGHT : u8 = 4;
+const SHIP_CONTROL_FIRE : u8 = 8;
+
 #[repr(C)]
 pub struct Asteroid {
     pos: (f32, f32),
@@ -435,7 +440,7 @@ pub struct Asteroid {
     type_idx: u8,
 }
 
-struct ShipVM {
+pub struct ShipVM {
     ship_control : u8,
     n_asteroids: usize,
     ptr_asteroids: *mut c_void
@@ -452,26 +457,14 @@ impl Default for ShipVM {
 }
 
 impl ShipVM {
-    fn into_void_mut(self) -> *mut c_void {
-        let ptr = Box::into_raw(Box::new(self));
-
-        unsafe {
-            std::mem::transmute(ptr)
-        }
+    fn into_heap_ptr(self) -> *mut Self {
+        Box::into_raw(Box::new(self))
     }
 
-    fn from_void_mut(ptr : *mut c_void) -> NonNull<Self> {
+    unsafe fn free_heap_ptr(ptr : *mut Self) {
         assert!(!ptr.is_null());
 
-        unsafe {
-            NonNull::new_unchecked(std::mem::transmute(ptr))
-        }
-    }
-
-    unsafe fn free_ptr(ptr : *mut c_void) {
-        assert!(!ptr.is_null());
-
-        Box::<Self>::from_raw(std::mem::transmute(ptr));
+        Box::<Self>::from_raw(ptr);
     }
 
     fn ship_forward_on(&mut self) {
@@ -498,29 +491,24 @@ impl ShipVM {
 // C interfaces
 
 #[no_mangle]
-pub extern "C" fn vm_c_compile(prog : *const u8) -> *mut c_void {
+pub extern "C" fn vm_c_compile(prog : *const c_char) -> *mut ShipVM {
     let ret : ShipVM = Default::default();
 
-    ret.into_void_mut()
+    ret.into_heap_ptr()
 }
 
-pub extern "C" fn vm_c_free(vm : *mut c_void) {
+pub extern "C" fn vm_c_free(vm : *mut ShipVM) {
     unsafe {
-        ShipVM::free_ptr(vm)
+        ShipVM::free_heap_ptr(vm)
     }
 }
 
 #[no_mangle]
-pub extern "C" fn vm_c_step(vm_ptr : *mut c_void, as_ptr :*mut Asteroid, len : usize) {
-    let vm = ShipVM::from_void_mut(vm_ptr);
+pub extern "C" fn vm_c_step(vm: *mut ShipVM, as_ptr :*mut Asteroid, len : usize) {
     let asteroids = unsafe {
         std::slice::from_raw_parts(as_ptr, len)
     };
 }
-
-const SHIP_CONTROL_FORWARD : u8 = 1;
-const SHIP_CONTROL_LEFT : u8 = 2;
-const SHIP_CONTROL_RIGHT : u8 = 4;
 
 #[no_mangle]
 pub extern "C" fn vm_c_get_ship_control(vm : *mut c_void) -> u8 {

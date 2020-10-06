@@ -8,13 +8,14 @@
 #include <datastructure/slice.h>
 #include <vm.h>
 
+#include "input.h"
+#include "rockets.h"
+#include "asteroids.h"
+
+
 #define NUM_ASTEROID_TYPES 4
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 450
-#define ASTEROID_TYPE_0 asteroids_types[0]
-#define ASTEROID_TYPE_1 asteroids_types[1]
-#define ASTEROID_TYPE_2 asteroids_types[2]
-#define ASTEROID_TYPE_3 asteroids_types[3]
 
 Vector2 rand_unit_vector2();
 float rand_unit_float();
@@ -24,88 +25,36 @@ Vector2 center = {
 	SCREEN_HEIGHT/2,
 };
 
-typedef struct asteroid_type {
-	float radius;
-	uint8_t child_count;
-	uint8_t child_idx; // index into asteoroid_types
-} asteroid_type_t;
 
-struct asteroid_type asteroid_types[] = {
-	{
-		.radius = 10,
-		.child_count = 0,
-		.child_idx = 0,
-	},
-	{
-		.radius = 15,
-		.child_count = 0,
-		.child_idx = 0,
-	},
-	{
-		.radius = 30,
-		.child_count = 2,
-		.child_idx = 1,
-	},
-	{
-		.radius = 40,
-		.child_count = 2,
-		.child_idx = 2,
-	},
-};
-
-typedef struct asteroid {
-	Vector2 pos;
-	Vector2 dir;
-	float rot;
-	float rotdt;
-	uint8_t type_idx;
-} asteroid_t;
-
-
-typedef struct asteroids {
-	slice_t inner;
-} asteroids_t;
-
-asteroids_t asteroids_new() {
-	slice_t inner = slice_new(sizeof(asteroid_t), 8, 16);
+void init_asteroids(asteroids_t * as) {
 
 	for (size_t i = 0; i < 8; i++) {
-		*(asteroid_t *) slice_idx(inner, i) = (struct asteroid) {
-			.pos = center,
+		bool is_x = rand_unit_float() < 0.5;
+		bool is_origin = rand_unit_float() < 0.5;
+
+		float x = SCREEN_WIDTH * rand_unit_float() * ((float) is_x) +
+			((float) !is_x) * ((float) !is_origin) * (SCREEN_WIDTH-1);
+		float y = SCREEN_HEIGHT * rand_unit_float() * ((float) !is_x) +
+			((float) is_x) * ((float) !is_origin) * (SCREEN_HEIGHT-1);
+
+		Vector2 pos = (Vector2){
+			.x = x,
+			.y = y, };
+
+		asteroid_t a = (asteroid_t) {
+			.pos = pos,
 			.dir = rand_unit_vector2(),
 			.rot = 360 * rand_unit_float(),
 			.rotdt = 2 * rand_unit_float() - 1,
 			.type_idx = 3,
+			.valid = true,
 		};
+
+		asteroids_add(as, a);
 	}
-
-	return (asteroids_t){
-		.inner = inner,
-	};
 }
 
-void asteroids_reset(asteroids_t * as) {
-	slice_t inner = as->inner;
-	inner = slice_slice(inner, 0, 0);
-}
-
-void asteroids_free(asteroids_t * as) {
-	slice_free(&as->inner);
-}
-
-asteroid_t * asteroids_idx(asteroids_t as, size_t idx) {
-	return (asteroid_t *) slice_idx(as.inner, idx);
-}
-
-size_t asteroids_len(asteroids_t as) {
-	return slice_len(as.inner);
-}
-
-size_t asteroids_data(asteroids_t as) {
-	return slice_data(as.inner);
-}
-
-Vector2 vec_up = { .x = 0, .y = 1 };
+Vector2 ship_forward_basis = { .y = 0, .x = 1 };
 
 #define SHIP_ANG_START (90.f)
 #define SHIP_SIDE_LEN (30.f)
@@ -146,9 +95,9 @@ bool did_ship_collide(ship_t * ship, asteroid_t * a) {
 	return Vector2Distance(ship->pos, a->pos) <= dist;
 }
 
-bool did_point_collide(Vector2 point, asteroid_t * a) {
+bool did_rocket_collide(rocket_t * r, asteroid_t * a) {
 	float dist = asteroid_types[a->type_idx].radius;
-	return Vector2Distance(point, a->pos) <= dist;
+	return Vector2Distance(r->pos, a->pos) <= dist;
 }
 
 
@@ -161,6 +110,15 @@ int main(void) {
 	srand(10);
 
 	asteroids_t asteroids = asteroids_new();
+	init_asteroids(&asteroids);
+
+	rockets_t rockets = rockets_new();
+	every_t rocket_every = (every_t) {
+		.every = 1.0 / 10.0,
+		.last_time = 0.0,
+		.current = false,
+	};
+
 	ship_t ship = (ship_t) {
 		.pos = center,
 		.dir = {0, 0},
@@ -181,8 +139,8 @@ int main(void) {
 		if (IsKeyDown(KEY_Q)) break;
 
 		vm_c_step(vm,
-			asteroids_len(asteroids),
-			asteroids_data(asteroids));
+			asteroids_data(asteroids),
+			asteroids_len(asteroids));
 
 		BeginDrawing();
 
@@ -192,8 +150,26 @@ int main(void) {
 
 		// draw + move asteroids
 		for (size_t i = 0; i < asteroids_len(asteroids); i++) {
-
 			asteroid_t * a = asteroids_idx(asteroids, i);
+
+			if (!a->valid) {
+				continue;
+			}
+
+			for (size_t i = 0; i < rockets_len(rockets); i++) {
+				rocket_t * r = rockets_idx(rockets, i);
+
+				if (!r->valid) {
+					continue;
+				}
+
+				if (did_rocket_collide(r, a)) {
+					a->valid = false;
+					r->valid = false;
+					goto asteroid_loop;
+				}
+			}
+
 			asteroid_type_t at = asteroid_types[a->type_idx];
 
 			ship_collision |= did_ship_collide(&ship, a);
@@ -209,46 +185,95 @@ int main(void) {
 
 			a->pos.x = fmodf(a->pos.x + SCREEN_WIDTH, SCREEN_WIDTH);
 			a->pos.y = fmodf(a->pos.y + SCREEN_HEIGHT, SCREEN_HEIGHT);
+
+asteroid_loop: {};
+
+		}
+
+		for (size_t i = 0; i < rockets_len(rockets); i++) {
+			rocket_t * r = rockets_idx(rockets, i);
+
+			if (!r->valid) {
+				continue;
+			}
+
+			DrawCircle(r->pos.x, r->pos.y, 1.0, WHITE);
+			// move asteroid
+			r->pos = Vector2Add(
+					r->pos,
+					Vector2Scale(Vector2Rotate(ship_forward_basis, r->ang),
+						5.0));
+			float x = r->pos.x;
+			float y = r->pos.y;
+
+			if (x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_WIDTH) {
+				r->valid = false;
+			}
 		}
 
 		// draw ship
-		DrawTriangleLines(
-			Vector2Add(
-				Vector2Rotate(ship_triangle[0], ship.ang),
-				ship.pos),
-			Vector2Add(
-				Vector2Rotate(ship_triangle[1], ship.ang),
-				ship.pos),
-			Vector2Add(
-				Vector2Rotate(ship_triangle[2], ship.ang),
-				ship.pos),
-				WHITE);
+		if (!game_over) {
+			DrawTriangleLines(
+				Vector2Add(
+					Vector2Rotate(ship_triangle[0], ship.ang),
+					ship.pos),
+				Vector2Add(
+					Vector2Rotate(ship_triangle[1], ship.ang),
+					ship.pos),
+				Vector2Add(
+					Vector2Rotate(ship_triangle[2], ship.ang),
+					ship.pos),
+					WHITE);
+		}
 
-		ship.pos = Vector2Add(ship.pos, ship.dir);
-
-		ship.pos.x = fmodf(ship.pos.x + SCREEN_WIDTH, SCREEN_WIDTH);
-		ship.pos.y = fmodf(ship.pos.y + SCREEN_HEIGHT, SCREEN_HEIGHT);
 
 		uint8_t ship_control = vm_c_get_ship_control(vm);
 
-		// move the ship
-		const float torque = 8;
-		float omega = 0;
-		if (IsKeyDown(KEY_A) | (ship_control & SHIP_CONTROL_LEFT)) omega -= torque;
-		if (IsKeyDown(KEY_D) | (ship_control & SHIP_CONTROL_RIGHT)) omega += torque;
-		// printf("omega: %f", omega);
-		ship.ang = fmodf(360 + ship.ang + omega, 360);
+		// fire rockets
+		every_update(&rocket_every,
+			IsKeyDown(KEY_SPACE) | (ship_control & SHIP_CONTROL_FIRE),
+			GetTime());
 
-		ship.dir = Vector2Scale(ship.dir, 0.95);
+		if (every_value(&rocket_every)) {
+			// front of the ship
+			Vector2 pos = Vector2Add(
+				Vector2Rotate(ship_triangle[0], ship.ang),
+				ship.pos);
 
-		if (IsKeyDown(KEY_W) | (ship_control & SHIP_CONTROL_FORWARD)) {
-			ship.acc = Clamp(ship.acc + 0.01, 0, 0.2);
-		} else {
-			ship.acc = 0;
+			rocket_t r = (rocket_t) {
+				.pos = pos,
+				.ang = ship.ang,
+				.valid = true,
+			};
+
+			rockets_add(&rockets, r);
 		}
 
-		ship.dir = Vector2Add(ship.dir,
-			Vector2FromPolar(ship.ang, ship.acc));
+		if (!game_over) {
+			// move the ship
+			const float torque = 8;
+			float omega = 0;
+			if (IsKeyDown(KEY_A) | (ship_control & SHIP_CONTROL_LEFT)) omega -= torque;
+			if (IsKeyDown(KEY_D) | (ship_control & SHIP_CONTROL_RIGHT)) omega += torque;
+			// printf("omega: %f", omega);
+			ship.ang = fmodf(360 + ship.ang + omega, 360);
+
+			ship.dir = Vector2Scale(ship.dir, 0.95);
+
+			if (IsKeyDown(KEY_W) | (ship_control & SHIP_CONTROL_FORWARD)) {
+				ship.acc = Clamp(ship.acc + 0.01, 0, 0.2);
+			} else {
+				ship.acc = 0;
+			}
+
+			ship.dir = Vector2Add(ship.dir,
+				Vector2FromPolar(ship.ang, ship.acc));
+
+			ship.pos = Vector2Add(ship.pos, ship.dir);
+
+			ship.pos.x = fmodf(ship.pos.x + SCREEN_WIDTH, SCREEN_WIDTH);
+			ship.pos.y = fmodf(ship.pos.y + SCREEN_HEIGHT, SCREEN_HEIGHT);
+		}
 
 		DrawFPS(10, 10);
 
