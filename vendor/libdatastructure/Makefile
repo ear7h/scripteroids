@@ -9,6 +9,8 @@ SHELL := /bin/bash
 # explicitly set the c compiler to gcc
 CC := gcc
 
+UNAME = $(shell uname)
+
 # use c11, give all warnings, more warnings, use the include dir in this repo
 CFLAGS := -std=c11 -Wall -pedantic -I./include
 
@@ -24,7 +26,13 @@ endif
 CTESTFLAGS :=-g -I./
 
 # command that archives object files into a static library
-AR := libtool -static
+ifeq ($(UNAME), Darwin)
+	AR := libtool -static -o
+endif
+
+ifeq ($(UNAME), Linux)
+	AR := ar rcs
+endif
 
 # libraries to be added to the binary
 LIBS :=
@@ -77,7 +85,7 @@ OBJECTS = $(_OBJECTS:%=src/%.o)
 objects: $(OBJECTS)
 
 src/libdatastructure.a: $(OBJECTS)
-	$(AR) $(OBJECTS) -o $@
+	$(AR) $@ $(OBJECTS) 
 
 .PHONY: archive
 archive: src/libdatastructure.a

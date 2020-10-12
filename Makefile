@@ -1,11 +1,18 @@
 
 SHELL := /usr/bin/env sh
 
+UNAME := $(shell uname)
+HEADLESS ?= false
+
 CC := gcc
 
 CFLAGS := -std=c99 \
 	-Wall -Wextra -Wpedantic \
 	-Wstrict-overflow
+
+ifeq ($(HEADLESS), true)
+	CFLAGS += -DHEADLESS -DRAYMATH_HEADER_ONLY
+endif
 
 INCLUDES := -I./include \
 	-I./libvm/include/ \
@@ -15,11 +22,18 @@ INCLUDES := -I./include \
 
 LD := gcc
 
-LDFLAGS := -framework CoreVideo \
-	-framework IOKit \
-	-framework Cocoa \
-	-framework GLUT \
-	-framework OpenGL
+ifeq ($(UNAME), Darwin)
+	LDFLAGS := -framework CoreVideo \
+		-framework IOKit \
+		-framework Cocoa \
+		-framework GLUT \
+		-framework OpenGL
+endif
+
+ifeq ($(UNAME), Linux)
+	LDFLAGS :=
+endif
+
 
 DEBUG := true
 
@@ -55,23 +69,33 @@ $(BUILD_DIR)/libvm.a:
 	cd libvm && cargo build
 	cp libvm/target/debug/libvm.a $(BUILD_DIR)
 
-_LIBS = raylib datastructure vm
+_LIBS = datastructure vm
+ifneq ($(HEADLESS), true)
+	_LIBS += raylib
+endif
+
 LIBS = $(_LIBS:%=$(BUILD_DIR)/lib%.a)
+
+ifeq ($(UNAME), Linux)
+	LINK_LIBS := -lpthread -ldl -lm
+endif
+
 
 .PHONY: libs
 libs: $(BUILD_DIR) $(LIBS)
+	echo $(LIBS)
 
 $(BUILD_DIR)/%.o: src/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ -c $<
 
-_OBJECTS = main rockets asteroids input
+_OBJECTS = main rockets asteroids input lib
 OBJECTS = $(_OBJECTS:%=$(BUILD_DIR)/%.o)
 
 .PHONY: objects
 objects: $(OBJECTS)
 
 $(BUILD_DIR)/scripteroids: $(BUILD_DIR) $(LIBS) $(OBJECTS)
-	$(LD) $(LDFLAGS) $(LIBS) $(OBJECTS) -o $@
+	$(LD) $(LDFLAGS) $(OBJECTS) $(LIBS) $(LINK_LIBS) -o $@
 
 .PHONY: all
 all: $(BUILD_DIR)/scripteroids

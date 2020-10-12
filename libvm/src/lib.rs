@@ -432,12 +432,11 @@ const SHIP_CONTROL_RIGHT : u8 = 4;
 const SHIP_CONTROL_FIRE : u8 = 8;
 
 #[repr(C)]
-pub struct Asteroid {
-    pos: (f32, f32),
-    dir: (f32, f32),
-    rot: f32,
-    rotdt: f32,
-    type_idx: u8,
+pub struct AsteroidRel {
+    radius: f32,
+    distance: f32,
+    angle: f32,
+    heading: f32,
 }
 
 pub struct ShipVM {
@@ -458,13 +457,17 @@ impl Default for ShipVM {
 
 impl ShipVM {
     fn into_heap_ptr(self) -> *mut Self {
-        Box::into_raw(Box::new(self))
+        let ret = Box::into_raw(Box::new(self));
+        println!("alloced {:?}", ret);
+        ret
+
     }
 
     unsafe fn free_heap_ptr(ptr : *mut Self) {
         assert!(!ptr.is_null());
+        println!("dropping {:?}", ptr);
 
-        Box::<Self>::from_raw(ptr);
+        std::mem::drop(Box::<Self>::from_raw(ptr));
     }
 
     fn ship_forward_on(&mut self) {
@@ -497,6 +500,7 @@ pub extern "C" fn vm_c_compile(prog : *const c_char) -> *mut ShipVM {
     ret.into_heap_ptr()
 }
 
+#[no_mangle]
 pub extern "C" fn vm_c_free(vm : *mut ShipVM) {
     unsafe {
         ShipVM::free_heap_ptr(vm)
@@ -504,15 +508,15 @@ pub extern "C" fn vm_c_free(vm : *mut ShipVM) {
 }
 
 #[no_mangle]
-pub extern "C" fn vm_c_step(vm: *mut ShipVM, as_ptr :*mut Asteroid, len : usize) {
-    let asteroids = unsafe {
-        std::slice::from_raw_parts(as_ptr, len)
-    };
-}
+pub extern "C" fn vm_c_step(vm: *mut ShipVM,
+                            ptr :*mut AsteroidRel,
+                            len : usize) -> u8 {
 
-#[no_mangle]
-pub extern "C" fn vm_c_get_ship_control(vm : *mut c_void) -> u8 {
-    SHIP_CONTROL_FORWARD | SHIP_CONTROL_LEFT
+    let asteroids = unsafe {
+        std::slice::from_raw_parts(ptr, len)
+    };
+
+    SHIP_CONTROL_FORWARD | SHIP_CONTROL_LEFT | SHIP_CONTROL_FIRE
 }
 
 

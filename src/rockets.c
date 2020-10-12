@@ -16,6 +16,11 @@ rocket_t * rockets_idx(rockets_t rs, size_t idx) {
 	return slice_idx(rs.inner, idx);
 }
 
+void rockets_free(rockets_t * rs) {
+	slice_free(&rs->inner);
+}
+
+
 void rockets_add(rockets_t * rs, rocket_t r) {
     assert(r.valid);
 

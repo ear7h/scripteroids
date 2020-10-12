@@ -71,7 +71,7 @@ slice_t slice_slice(slice_t s, size_t start, size_t end) {
 }
 
 void slice_clear(slice_t s) {
-
+	assert(!"TODO");
 }
 
 void slice_free(slice_t * s) {
