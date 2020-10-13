@@ -17,9 +17,8 @@ Vector2 center = {
 	SCREEN_HEIGHT/2,
 };
 
-int main(void) {
-	srand(10);
 
+bool run_one_game() {
 	scripteroids_t s = (scripteroids_t) {
 		.asteroids = asteroids_new(),
 		.rockets = rockets_new(),
@@ -49,21 +48,19 @@ int main(void) {
 	};
 
 	vm_t * vm = vm_c_compile("");
-	bool game_over = false;
+
+
+    bool finish_win = false;
 
 #ifndef HEADLESS
-	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "scripteroids");
-
-	SetTargetFPS(60);
 
 	// Detect window close button or ESC key
-	while (!WindowShouldClose()) {
-
-		if (IsKeyDown(KEY_Q)) break;
-
+	while (!WindowShouldClose() && !IsKeyDown(KEY_Q)) {
 		BeginDrawing();
 
 		ClearBackground(BLACK);
+
+        finish_win = true;
 
 		// draw asteroids
 		for (size_t i = 0; i < asteroids_len(s.asteroids); i++) {
@@ -72,6 +69,8 @@ int main(void) {
 			if (!a->valid) {
 				continue;
 			}
+
+            finish_win = false;
 
 			asteroid_type_t at = asteroid_types[a->type_idx];
 
@@ -92,7 +91,7 @@ int main(void) {
 
 
 		// draw ship
-		if (!game_over) {
+		//if (!game_over) {
 			DrawTriangleLines(
 				Vector2Add(
 					Vector2Rotate(ship_triangle[0], s.ship.ang),
@@ -104,7 +103,7 @@ int main(void) {
 					Vector2Rotate(ship_triangle[2], s.ship.ang),
 					s.ship.pos),
 					WHITE);
-		}
+		//}
 
 		scripteroids_asteroids_rel(&s,
 			&asteroid_rel_buf.data,
@@ -186,19 +185,16 @@ int main(void) {
 		DrawText(buf, 10, 40, 20, WHITE);
 
 		if (ship_collision) {
-			game_over |= ship_collision;
 			DrawText("collision: true" , 10, 60, 20, WHITE);
 		} else {
 			DrawText("collision: false" , 10, 60, 20, WHITE);
 		}
 
 		EndDrawing();
-#else
-		if (ship_collision) {
-			game_over = true;
+#endif
+		if (ship_collision || finish_win) {
 			break;
 		}
-#endif
 	}
 
 	asteroids_free(&s.asteroids);
@@ -206,15 +202,26 @@ int main(void) {
 	vm_c_free(vm);
 	slice_free(&asteroid_rel_buf);
 
+    return finish_win;
+}
+
+
+int main(void) {
+	srand(10);
+
+
+	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "scripteroids");
+
+	SetTargetFPS(960);
+
+	while (!WindowShouldClose() && !IsKeyDown(KEY_Q)) {
+        if (run_one_game()) {
+            printf("winner!\n");
+        }
+    }
+
 #ifndef HEADLESS
 	// Close window and OpenGL context
 	CloseWindow();
 #endif
-
-	if (game_over) {
-		return 1;
-	} else {
-		return 0;
-	}
 }
-

@@ -4,6 +4,7 @@
 #include <datastructure/slice.h>
 
 #include "lib.h"
+#include "utils.h"
 
 Vector2 ship_triangle[] = {
 	{
@@ -59,7 +60,20 @@ bool scripteroids_step(scripteroids_t * s, uint8_t ship_control) {
 			}
 
 			if (did_rocket_collide(r, a)) {
-				a->valid = false;
+				if (a->type_idx) {
+					asteroid_type_t at = asteroid_types[a->type_idx];
+
+					a->type_idx--;
+
+					for (size_t i = 1; i < at.child_count; i++) {
+						asteroid_t aa = *a;
+						aa.dir = Vector2Rotate(aa.dir, rand_unit_float() * 180 - 90);
+						asteroids_add(&s->asteroids, aa);
+					}
+					a->dir = Vector2Rotate(a->dir, rand_unit_float() * 180 - 90);
+				} else {
+					a->valid = false;
+				}
 				r->valid = false;
 				s->score++;
 				goto asteroid_loop;
@@ -166,6 +180,8 @@ void scripteroids_asteroids_rel(const scripteroids_t * s,
 
 	for (size_t i = 0; i < asteroids_len(as); i++) {
 		asteroid_t a = *asteroids_idx(as, i);
+		asteroid_type_t at = asteroid_types[a.type_idx];
+
 		if (!a.valid) {
 			continue;
 		}
@@ -187,7 +203,7 @@ void scripteroids_asteroids_rel(const scripteroids_t * s,
 		if (heading > 180.0) { heading -= 360; }
 
 		asteroid_rel_t ar = (asteroid_rel_t) {
-			.radius = a.radius,
+			.radius = at.radius,
 			.distance = Vector2Distance(a.pos, ship.pos),
 			.angle = angle,
 			.heading = heading,

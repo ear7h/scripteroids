@@ -6,6 +6,7 @@ use std::{
         c_void,
         c_char,
     },
+    cmp::Ordering,
 };
 
 /// errors when building an architecture
@@ -432,6 +433,7 @@ const SHIP_CONTROL_RIGHT : u8 = 4;
 const SHIP_CONTROL_FIRE : u8 = 8;
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct AsteroidRel {
     radius: f32,
     distance: f32,
@@ -511,12 +513,35 @@ pub extern "C" fn vm_c_free(vm : *mut ShipVM) {
 pub extern "C" fn vm_c_step(vm: *mut ShipVM,
                             ptr :*mut AsteroidRel,
                             len : usize) -> u8 {
+    if len == 0 {
+        return 0;
+    }
 
     let asteroids = unsafe {
         std::slice::from_raw_parts(ptr, len)
     };
 
-    SHIP_CONTROL_FORWARD | SHIP_CONTROL_LEFT | SHIP_CONTROL_FIRE
+    let mut target = asteroids[0];
+
+    for (i, v) in asteroids[1..].iter().enumerate() {
+        if v.angle < 10.0 && v.distance < target.distance {
+            target = *v;
+        }
+    }
+
+    let tangle = target.angle;
+
+    let delta = 8.0;
+
+    if (-delta..delta).contains(&tangle) {
+        SHIP_CONTROL_FIRE
+    } else if tangle < 0.0 {
+        SHIP_CONTROL_RIGHT
+    } else if tangle > 0.0 {
+        SHIP_CONTROL_LEFT
+    } else {
+        0
+    }
 }
 
 

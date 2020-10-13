@@ -19,7 +19,6 @@ typedef struct asteroid {
 	Vector2 dir;
 	float rot;
 	float rotdt;
-    float radius;
 	uint8_t type_idx;
 	bool valid;
 } asteroid_t;
